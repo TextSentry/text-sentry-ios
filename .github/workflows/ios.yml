@@ -1,0 +1,70 @@
+name: iOS CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    name: iOS simulator / build and tests
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Show Xcode setup
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project TextSentry.xcodeproj
+      - name: Pick an available iPhone simulator
+        id: simulator
+        run: |
+          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c 'import sys,json; data=json.load(sys.stdin)["devices"]; print(next((dev["udid"] for group in data.values() for dev in group if "iPhone" in dev["name"] and dev.get("isAvailable", False)), ""))')"
+          if [[ -z "$DEVICE_ID" ]]; then echo "::error::No iPhone simulator available"; exit 1; fi
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+      - name: Unit tests on simulator
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project TextSentry.xcodeproj -scheme TextSentry -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/TextSentry-tests.xcresult" \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Simulator build
+        run: |
+          xcodebuild build \
+            -project TextSentry.xcodeproj -scheme TextSentry -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Verify message filter is bundled
+        run: |
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/TextSentry.app"
+          test -d "$APP"
+          test -d "$APP/PlugIns/TextSentryMessageFilter.appex"
+          /usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' \
+            "$APP/PlugIns/TextSentryMessageFilter.appex/Info.plist" | grep -Fx 'com.apple.identitylookup.message-filter'
+          (cd "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator" && zip -qry "$RUNNER_TEMP/TextSentry-iOS-simulator.zip" TextSentry.app)
+      - name: Upload unsigned simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: TextSentry-iOS-simulator-app
+          path: ${{ runner.temp }}/TextSentry-iOS-simulator.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-test-results
+          path: ${{ runner.temp }}/TextSentry-tests.xcresult
+          if-no-files-found: ignore
