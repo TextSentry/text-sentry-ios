@@ -1,0 +1,15 @@
+# XcodeGen generates the project locally and in CI.
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+.build/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+*.ipa
+*.mobileprovision
+*.p12
+*.cer
+*.key
+.env
