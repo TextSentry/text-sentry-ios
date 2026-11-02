@@ -315,7 +315,7 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .alert("Using your own API key", isPresented: $agreeOwnKey) {
+        .confirmationDialog("Using your own API key", isPresented: $agreeOwnKey, titleVisibility: .visible) {
             Button("Cancel", role: .cancel) {}
             Button("I understand and agree") {
                 do {

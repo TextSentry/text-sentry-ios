@@ -11,11 +11,14 @@ struct TextSentryApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if !account.signedIn && !account.hasBYOK {
+                switch IosSetupGate.destination(signedIn: account.signedIn,
+                                                hasOwnKey: account.hasBYOK,
+                                                setupComplete: setupComplete) {
+                case .login:
                     WelcomeView()
-                } else if !setupComplete {
+                case .filterSetup:
                     GuidedSetupView()
-                } else {
+                case .home:
                     TabView {
                         NavigationStack { HomeView() }
                             .tabItem { Label("Home", systemImage: "shield.lefthalf.filled") }

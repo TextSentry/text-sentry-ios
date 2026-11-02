@@ -20,6 +20,25 @@ final class FilterTests: XCTestCase {
         XCTAssertThrowsError(try JevContract.requestBody(message: "Huge sale", settings: settings))
     }
 
+    func testManagedAnalysisUsesStrictOpenRouterJevContract() throws {
+        var settings = FilterSettings()
+        settings.threshold = 0.9
+        let body = try JevContract.requestBody(message: "Special offer, 50% off! Reply STOP", settings: settings, provider: .managed)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["model"] as? String, "typesafe/jev-1.14")
+        XCTAssertEqual(JevProvider.managed.endpoint.absoluteString, "https://openrouter.ai/api/alpha/decisions")
+        XCTAssertEqual(JevProvider.byok.endpoint.absoluteString, "https://api.typesafe.ai/v1/systemone")
+        XCTAssertNil(json["messages"])
+        XCTAssertNotNil(json["questions"])
+    }
+
+    func testOnboardingRequiresAWorkingCredential() {
+        XCTAssertEqual(IosSetupGate.destination(signedIn: false, hasOwnKey: false, setupComplete: true), .login)
+        XCTAssertEqual(IosSetupGate.destination(signedIn: true, hasOwnKey: false, setupComplete: false), .filterSetup)
+        XCTAssertEqual(IosSetupGate.destination(signedIn: false, hasOwnKey: true, setupComplete: false), .filterSetup)
+        XCTAssertEqual(IosSetupGate.destination(signedIn: true, hasOwnKey: false, setupComplete: true), .home)
+    }
+
     func testSingleQuestionComposesAllSelectedCategories() throws {
         var settings = FilterSettings()
         settings.extraRestrictions = "Only if it was unsolicited."

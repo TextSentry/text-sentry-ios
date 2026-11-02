@@ -1,14 +1,14 @@
 # TextSentry iOS autonomous engineering contract
 
 ## Product constraints
-- Mirror Android's TypeSafe Jev (jev-latest) BYOK categories, minimum yes probability (50–100%, default 95%), safeguards, developer prompt restrictions, local history and privacy language when Apple APIs support it.
+- Mirror Android's TypeSafe Jev BYOK and managed OpenRouter decision-model flow, categories, minimum yes probability (50–100%, default 90%), safeguards, developer prompt restrictions, local history and privacy language when Apple APIs support it.
 - iOS IdentityLookup filters only unknown-sender SMS/MMS, not iMessage or Contacts. Its extension cannot make direct network calls or write App Group files.
-- Current iOS functionality: explicitly consented manual BYOK Jev reviews plus opt-in offline conservative extension rules. Do not claim Jev runs on incoming SMS, automatic STOP is sent, SMS is deleted, or incoming SMS history exists.
+- Current iOS functionality: Google/Cognito OAuth PKCE, existing-subscription managed-key manual reviews, explicitly consented manual BYOK Jev reviews, opt-in offline conservative extension rules. Do not claim Jev runs on incoming SMS, automatic STOP is sent, SMS is deleted, or incoming SMS history exists.
 - Do not route users' SMS through TextSentry AWS. No analytics, no telemetry, no user SMS content in CI or logs.
-- The fixed TypeSafe endpoint is https://api.typesafe.ai/v1/systemone, model jev-latest, one noul questions.reply with the selected categories ORed. Fail closed on invalid JSON, HTTP failures, OTPs, official election notices and ambiguous content.
+- BYOK: https://api.typesafe.ai/v1/systemone, model jev-latest. Managed: https://openrouter.ai/api/alpha/decisions, model typesafe/jev-1.14 with a RAM-only backend-issued key. Both use one noul questions.reply with categories ORed; fail closed on invalid JSON, HTTP failures, OTPs, official election notices and ambiguous content.
 - Never put BYOK keys in UserDefaults or App Group storage. Store API keys and local archive keys in iOS Keychain; AES-GCM encrypt message/traces on disk.
 - Extension reads ONLY preferences from App Group and never reads a key, archives message contents, or makes HTTP requests. Offline rules are disabled by default and never portrayed as AI.
-- Do not implement Sign in with Apple until separately requested. Never build unsupported automatic replies or message deletion.
+- Google sign-in uses only the backend-provided Cognito public client and registered redirect. Never bundle a client secret. Persist OAuth tokens in Keychain, managed API keys in RAM only. Sign-out must clear all auth state; no user-supplied identity can bypass backend subscription validation. Do not implement Sign in with Apple or iOS purchases until separately requested. Never build unsupported automatic replies or message deletion.
 
 ## Autonomous development workflow
 1. Read this file, README, PRIVACY, project.yml, test suite, open PRs and current GitHub Actions status.

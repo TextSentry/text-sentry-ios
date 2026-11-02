@@ -1,3 +1,13 @@
+import Foundation
+
+enum IosSetupGate {
+    enum Destination: Equatable { case login, filterSetup, home }
+    static func destination(signedIn: Bool, hasOwnKey: Bool, setupComplete: Bool) -> Destination {
+        guard signedIn || hasOwnKey else { return .login }
+        return setupComplete ? .home : .filterSetup
+    }
+}
+
 import SwiftUI
 import UIKit
 
@@ -86,7 +96,6 @@ struct OwnKeyEntryView: View {
     @EnvironmentObject private var account: GoogleAccountStore
     @Environment(\.dismiss) private var dismiss
     @State private var key = ""
-    @State private var agreed = false
     @State private var confirm = false
     @State private var errorText: String?
 
@@ -107,7 +116,7 @@ struct OwnKeyEntryView: View {
         }
         .navigationTitle("Use your own key")
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-        .alert("Using your own API key", isPresented: $confirm) {
+        .confirmationDialog("Using your own API key", isPresented: $confirm, titleVisibility: .visible) {
             Button("Cancel", role: .cancel) {}
             Button("I understand and agree") {
                 do {
