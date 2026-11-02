@@ -1,4 +1,5 @@
 import AuthenticationServices
+import Combine
 import CryptoKit
 import Foundation
 import Security
@@ -179,7 +180,7 @@ enum AccountHTTP {
 }
 
 @MainActor
-final class GoogleAccountStore: ObservableObject {
+final class GoogleAccountStore: NSObject, ObservableObject {
     @Published private(set) var hasBYOK: Bool = KeychainVault.apiKey != nil
     @Published private(set) var signedIn: Bool
     @Published private(set) var subscriptionLabel = "Subscription status not checked"
@@ -188,7 +189,10 @@ final class GoogleAccountStore: ObservableObject {
     private var cachedKey: String?
     private var cachedKeyExpiry: Date = .distantPast
 
-    init() { signedIn = KeychainVault.read("cognito-session") != nil }
+    override init() {
+        signedIn = KeychainVault.read("cognito-session") != nil
+        super.init()
+    }
 
     private func storedTokens() throws -> CognitoTokens {
         guard let data = KeychainVault.read("cognito-session"),
