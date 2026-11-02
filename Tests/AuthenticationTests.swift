@@ -71,6 +71,8 @@ final class AuthenticationTests: XCTestCase {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let valid = Data(#"{"key":"sk-managed","period":"2026-11","expires_at":"2026-12-01T00:00:00Z","monthly_limit_usd":1.0}"#.utf8)
         XCTAssertEqual(try ManagedKeyResponse.parse(valid, now: now).key, "sk-managed")
+        let fractional = Data(#"{"key":"sk-managed","period":"2026-11","expires_at":"2026-12-01T00:00:00.123Z","monthly_limit_usd":1.0}"#.utf8)
+        XCTAssertEqual(try ManagedKeyResponse.parse(fractional, now: now).key, "sk-managed")
         for raw in [
             #"{"key":"sk","period":"invalid","expires_at":"2026-12-01T00:00:00Z","monthly_limit_usd":1}"#,
             #"{"key":"sk","period":"2026-11","expires_at":"2026-12-01T00:00:00Z","monthly_limit_usd":9}"#,
