@@ -2,6 +2,10 @@
 
 **Less noise. More signal.** Native iOS 17+ companion to [TextSentry Android](https://github.com/TextSentry/text-sentry-android), using the same Jev decision model and privacy principles where iOS permits.
 
+## License
+
+TextSentry iOS source code is **source-available for noncommercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, study, modify, and redistribute the code for permitted noncommercial purposes, including personal and hobby use. **Commercial use requires a separate written license from the applicable copyright holder.** This is not an OSI-approved open-source license. Third-party components retain their own licenses; this grant does not grant TextSentry trademark rights or imply endorsement.
+
 ## Implemented
 
 - Google sign-in via the **existing TextSentry Cognito public client**, OAuth authorization-code + S256 PKCE and an ephemeral Apple authentication session. Session tokens are stored in the iOS Keychain; signing out removes them. The Google account chooser is requested on each fresh sign-in.
