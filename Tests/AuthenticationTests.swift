@@ -33,7 +33,7 @@ final class AuthenticationTests: XCTestCase {
             "https://textsentry-prod-641010880844.auth.us-east-1.amazoncognito.com/evil",
             "https://textsentry-prod-641010880844.auth.us-east-1.amazoncognito.com?redirect=evil",
             "https://textsentry-prod-641010880844.auth.us-east-1.amazoncognito.com:443"
-        ] { XCTAssertThrowsError(try GoogleOAuthConfiguration.parse(config(host: host))) }
+        ] { XCTAssertThrowsError(try GoogleOAuthConfiguration.parse(config(GoogleOAuthConfiguration.redirect, host))) }
         XCTAssertThrowsError(try GoogleOAuthConfiguration.parse(config("evil://auth/callback")))
     }
 
