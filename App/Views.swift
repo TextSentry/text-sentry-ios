@@ -17,6 +17,7 @@ private struct SentrySection<Content: View>: View {
 
 struct HomeView: View {
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var account: GoogleAccountStore
 
     var body: some View {
         ScrollView {
@@ -33,9 +34,10 @@ struct HomeView: View {
                 .padding(.bottom, 8)
 
                 SentrySection(title: "AI connection") {
-                    Label(KeychainVault.apiKey == nil ? "Add your TypeSafe key in Settings" : "BYOK key saved on this device",
-                          systemImage: KeychainVault.apiKey == nil ? "key" : "checkmark.shield")
-                    Text("Model: jev-latest · Confidence: \(Int(settings.value.threshold * 100))%")
+                    Label(account.signedIn ? "Google account connected" :
+                          account.hasBYOK ? "TypeSafe key saved on device" : "Connect an account",
+                          systemImage: account.signedIn ? "person.crop.circle.badge.checkmark" : "key")
+                    Text("Jev · Confidence: \(Int(settings.value.threshold * 100))%")
                         .foregroundStyle(.secondary)
                 }
 
@@ -50,7 +52,7 @@ struct HomeView: View {
                 }
 
                 SentrySection(title: "Privacy first") {
-                    Text("Only messages you explicitly submit under Review are sent directly to TypeSafe over HTTPS. No message text goes to TextSentry servers.")
+                    Text("Only messages you submit for manual review go directly to the selected AI provider. No message text goes to TextSentry servers.")
                         .font(.subheadline)
                 }
             }
@@ -65,6 +67,7 @@ struct ManualReviewView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var history: HistoryStore
     @EnvironmentObject private var traces: TraceStore
+    @EnvironmentObject private var account: GoogleAccountStore
     @State private var message = ""
     @State private var consent = false
     @State private var evaluating = false
@@ -85,8 +88,8 @@ struct ManualReviewView: View {
             } header: { Text("Message") }
 
             Section("Consent") {
-                Toggle("Send this message directly to TypeSafe for analysis", isOn: $consent)
-                Text("Only the message and selected filtering instructions are sent. Your key is used to authenticate directly with TypeSafe.")
+                Toggle(account.signedIn ? "Send this message directly to OpenRouter for Jev analysis" : "Send this message directly to TypeSafe for analysis", isOn: $consent)
+                Text("Only the message and selected filtering instructions are sent directly to the AI provider. The message is never sent to TextSentry AWS.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -98,7 +101,7 @@ struct ManualReviewView: View {
                     else { Label("Analyze with Jev", systemImage: "sparkles") }
                 }
                 .disabled(evaluating || !consent || message.isEmpty || message.count > 1600 ||
-                          settings.value.categoryMask == 0 || KeychainVault.apiKey == nil)
+                          settings.value.categoryMask == 0 || (!account.signedIn && !account.hasBYOK))
             }
 
             if let result {
@@ -119,16 +122,22 @@ struct ManualReviewView: View {
 
     @MainActor
     private func analyze() async {
-        guard consent, let key = KeychainVault.apiKey else { return }
+        guard consent else { return }
         result = nil
         errorMessage = nil
         evaluating = true
         let reviewedMessage = message
         let capturedSettings = settings.value
+        let managed = account.signedIn
         defer { evaluating = false; consent = false }
         do {
+            let key: String
+            if managed { key = try await account.managedKey() }
+            else if let ownKey = KeychainVault.apiKey { key = ownKey }
+            else { throw JevError.invalidSettings }
             let evaluation = try await JevClient().analyze(
                 message: reviewedMessage, key: key, settings: capturedSettings,
+                provider: managed ? .managed : .byok,
                 trace: { request, response in
                     Task { @MainActor in
                         if settings.value.developerModeEnabled {
@@ -190,6 +199,11 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var history: HistoryStore
     @EnvironmentObject private var traces: TraceStore
+    @EnvironmentObject private var account: GoogleAccountStore
+    @AppStorage("setupComplete") private var setupComplete = false
+    @State private var accountBusy = false
+    @State private var accountError: String?
+    @State private var agreeOwnKey = false
     @State private var enteredKey = ""
     @State private var keyIsSaved = KeychainVault.apiKey != nil
     @State private var keyError: String?
@@ -209,6 +223,26 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            if account.signedIn {
+                Section("Google account") {
+                    Label("Signed in with Google", systemImage: "checkmark.shield")
+                    Text(account.subscriptionLabel).font(.subheadline).foregroundStyle(.secondary)
+                    Button("Check subscription status") {
+                        accountBusy = true
+                        accountError = nil
+                        Task {
+                            defer { accountBusy = false }
+                            do { try await account.checkAccount() }
+                            catch { accountError = error.localizedDescription }
+                        }
+                    }.disabled(accountBusy)
+                    if accountBusy { ProgressView() }
+                    if let accountError { Text(accountError).foregroundStyle(.red) }
+                    Text("Managed Jev access uses your existing active subscription. New subscriptions and Apple Pay are not available in this iOS beta.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Sign out", role: .destructive) { account.signOut() }
+                }
+            } else {
             Section {
                 SecureField("TypeSafe API key", text: $enteredKey)
                     .textInputAutocapitalization(.never)
@@ -216,18 +250,11 @@ struct SettingsView: View {
                     .privacySensitive()
                 Text(keyIsSaved ? "API key saved in iOS Keychain" : "No API key saved")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("Save BYOK key") {
-                    do {
-                        try KeychainVault.setAPIKey(enteredKey)
-                        enteredKey = ""
-                        keyIsSaved = true
-                        keyError = nil
-                    } catch {
-                        keyError = "Unable to store the key securely."
-                    }
-                }.disabled(enteredKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Save BYOK key") { agreeOwnKey = true }
+                    .disabled(enteredKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Button("Remove key", role: .destructive) {
                     KeychainVault.delete("typesafe-api-key")
+                    account.ownKeyChanged()
                     keyIsSaved = false
                     enteredKey = ""
                 }.disabled(!keyIsSaved)
@@ -239,7 +266,8 @@ struct SettingsView: View {
                         if developerTaps >= 7 { developerTaps = 0; confirmDeveloper = true }
                     }
             } footer: {
-                Text("Provider and model are fixed: TypeSafe AI / jev-latest. Key stays in Keychain; no TextSentry account required.")
+                Text("Your key stays in Keychain. TypeSafe's own retention and billing terms apply.")
+            }
             }
 
             Section("Filter categories") {
@@ -282,11 +310,25 @@ struct SettingsView: View {
                 Button("Delete all local app data", role: .destructive) {
                     confirmErase = true
                 }
-                Text("Erases the API key, manual history and developer traces; does not delete messages in Apple's Messages app.")
+                Text("Signs out, erases local credentials, manual history and developer traces; does not delete messages in Apple's Messages app.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Settings")
+        .confirmationDialog("Using your own API key", isPresented: $agreeOwnKey, titleVisibility: .visible) {
+            Button("Cancel", role: .cancel) {}
+            Button("I understand and agree") {
+                do {
+                    try KeychainVault.setAPIKey(enteredKey)
+                    account.ownKeyChanged()
+                    enteredKey = ""
+                    keyIsSaved = true
+                    keyError = nil
+                } catch { keyError = "Unable to store the key securely." }
+            }
+        } message: {
+            Text("Messages are sent directly to TypeSafe using your own account. TextSentry's managed zero-data-retention protection does not apply. You are responsible for provider terms, retention agreements and charges.")
+        }
         .alert("Enable developer mode?", isPresented: $confirmDeveloper) {
             Button("Enable") { settings.value.developerModeEnabled = true }
             Button("Cancel", role: .cancel) {}
@@ -295,7 +337,10 @@ struct SettingsView: View {
         }
         .confirmationDialog("Permanently delete local TextSentry data?", isPresented: $confirmErase) {
             Button("Delete local data", role: .destructive) {
+                account.signOut()
                 KeychainVault.delete("typesafe-api-key")
+                account.ownKeyChanged()
+                setupComplete = false
                 keyIsSaved = false
                 enteredKey = ""
                 history.clear()

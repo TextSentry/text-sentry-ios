@@ -10,7 +10,7 @@ struct FilterSettings: Equatable {
     static let allCategories = vote | political | marketing
 
     var categoryMask = allCategories
-    var threshold = 0.95
+    var threshold = 0.90
     var offlineFilteringEnabled = false
     var developerModeEnabled = false
     var extraRestrictions = ""
@@ -18,10 +18,10 @@ struct FilterSettings: Equatable {
     static func load(from defaults: UserDefaults?) -> FilterSettings {
         guard let defaults else { return FilterSettings(categoryMask: 0) }
         let mask = defaults.object(forKey: "categories") as? Int ?? allCategories
-        let threshold = defaults.object(forKey: "threshold") as? Double ?? 0.95
+        let threshold = defaults.object(forKey: "threshold") as? Double ?? 0.90
         return FilterSettings(
             categoryMask: (mask >= 0 && (mask & ~allCategories) == 0) ? mask : 0,
-            threshold: threshold.isFinite && (0.5...1).contains(threshold) ? threshold : 0.95,
+            threshold: threshold.isFinite && (0.5...1).contains(threshold) ? threshold : 0.90,
             offlineFilteringEnabled: defaults.bool(forKey: "offlineFilteringEnabled"),
             developerModeEnabled: defaults.bool(forKey: "developerModeEnabled"),
             extraRestrictions: defaults.string(forKey: "extraRestrictions") ?? ""

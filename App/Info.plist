@@ -11,6 +11,7 @@
   <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
   <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
   <key>LSRequiresIPhoneOS</key><true/>
+  <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>textsentry</string></array></dict></array>
   <key>UILaunchScreen</key><dict/>
   <key>ITSAppUsesNonExemptEncryption</key><false/>
 </dict></plist>
