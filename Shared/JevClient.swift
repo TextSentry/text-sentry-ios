@@ -19,16 +19,34 @@ struct JevEvaluation: Equatable {
     let matches: Bool
 }
 
+enum JevProvider {
+    case byok, managed
+
+    var endpoint: URL {
+        switch self {
+        case .byok: JevContract.endpoint
+        case .managed: URL(string: "https://openrouter.ai/api/alpha/decisions")!
+        }
+    }
+
+    var model: String {
+        switch self {
+        case .byok: "jev-latest"
+        case .managed: "typesafe/jev-1.14"
+        }
+    }
+}
+
 enum JevContract {
     static let endpoint = URL(string: "https://api.typesafe.ai/v1/systemone")!
     static let model = "jev-latest"
 
-    static func requestBody(message: String, settings: FilterSettings) throws -> Data {
+    static func requestBody(message: String, settings: FilterSettings, provider: JevProvider = .byok) throws -> Data {
         guard MessagePolicy.eligible(sender: nil, body: message),
               settings.categoryMask != 0 else { throw JevError.invalidSettings }
         let rules = try settings.instructions()
         let payload: [String: Any] = [
-            "model": model,
+            "model": provider.model,
             "state": message,
             "questions": [
                 "reply": [
@@ -69,11 +87,12 @@ final class JevClient {
     private let delegate = NoRedirects()
 
     func analyze(message: String, key: String, settings: FilterSettings,
+                 provider: JevProvider = .byok,
                  trace: ((Data, Data) -> Void)? = nil) async throws -> JevEvaluation {
         guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw JevError.invalidSettings }
-        let body = try JevContract.requestBody(message: message, settings: settings)
-        var request = URLRequest(url: JevContract.endpoint)
+        let body = try JevContract.requestBody(message: message, settings: settings, provider: provider)
+        var request = URLRequest(url: provider.endpoint)
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("Bearer " + key.trimmingCharacters(in: .whitespacesAndNewlines), forHTTPHeaderField: "Authorization")

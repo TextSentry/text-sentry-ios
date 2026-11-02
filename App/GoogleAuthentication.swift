@@ -180,6 +180,7 @@ enum AccountHTTP {
 
 @MainActor
 final class GoogleAccountStore: ObservableObject {
+    @Published private(set) var hasBYOK: Bool = KeychainVault.apiKey != nil
     @Published private(set) var signedIn: Bool
     @Published private(set) var subscriptionLabel = "Subscription status not checked"
     private var session: ASWebAuthenticationSession?
@@ -280,6 +281,8 @@ final class GoogleAccountStore: ObservableObject {
         cachedKeyExpiry = key.expiry
         return key.key
     }
+
+    func ownKeyChanged() { hasBYOK = KeychainVault.apiKey != nil }
 
     func signOut() {
         generation += 1

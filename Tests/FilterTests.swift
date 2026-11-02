@@ -6,7 +6,7 @@ final class FilterTests: XCTestCase {
         let defaults = UserDefaults(suiteName: UUID().uuidString)!
         let loaded = FilterSettings.load(from: defaults)
         XCTAssertEqual(loaded.categoryMask, FilterSettings.allCategories)
-        XCTAssertEqual(loaded.threshold, 0.95)
+        XCTAssertEqual(loaded.threshold, 0.90)
         XCTAssertFalse(loaded.offlineFilteringEnabled)
     }
 
