@@ -43,8 +43,16 @@ struct ManagedKeyResponse {
               value.key.count <= 512, value.monthly_limit_usd == 1,
               value.period.range(of: #"^[0-9]{4}-(0[1-9]|1[0-2])$"#,
                                     options: .regularExpression) != nil,
-              let expiry = ISO8601DateFormatter().date(from: value.expires_at),
+              let expiry = parseExpiry(value.expires_at),
               expiry > now else { throw AccountError.unavailable }
         return .init(key: value.key, period: value.period, expiry: expiry)
+    }
+
+    private static func parseExpiry(_ value: String) -> Date? {
+        let standard = ISO8601DateFormatter()
+        if let date = standard.date(from: value) { return date }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: value)
     }
 }
