@@ -40,7 +40,9 @@ struct ManagedKeyResponse {
         }
         guard let value = try? JSONDecoder().decode(Wire.self, from: data),
               !value.key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              value.key.count <= 512, value.monthly_limit_usd == 1,
+              value.key.count <= 512,
+              // New accounts are capped at $0.90; legacy keys retain $1.00 until rotation.
+              (value.monthly_limit_usd == 0.9 || value.monthly_limit_usd == 1.0),
               value.period.range(of: #"^[0-9]{4}-(0[1-9]|1[0-2])$"#,
                                     options: .regularExpression) != nil,
               let expiry = parseExpiry(value.expires_at),
