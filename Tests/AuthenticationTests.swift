@@ -81,6 +81,26 @@ final class AuthenticationTests: XCTestCase {
         ] { XCTAssertThrowsError(try ManagedKeyResponse.parse(Data(raw.utf8), now: now)) }
     }
 
+    func testManagedKeyContractAcceptsOnlyCurrentAndLegacyLimits() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        func payload(_ limit: String) -> Data {
+            Data("""
+                {"key":"synthetic-managed-key","period":"2026-11","expires_at":"2026-12-01T00:00:00Z","monthly_limit_usd":\(limit)}
+                """.utf8)
+        }
+        for limit in ["0.9", "1", "1.0"] {
+            XCTAssertEqual(try ManagedKeyResponse.parse(payload(limit), now: now).key,
+                           "synthetic-managed-key")
+        }
+        for limit in ["0", "-1", "0.89", "0.91", "1.01", "5", "null", "\"0.9\""] {
+            XCTAssertThrowsError(try ManagedKeyResponse.parse(payload(limit), now: now),
+                                 "Invalid limit should fail: \(limit)")
+        }
+        XCTAssertThrowsError(try ManagedKeyResponse.parse(Data("""
+            {"key":"synthetic-managed-key","period":"2026-11","expires_at":"2026-12-01T00:00:00Z"}
+            """.utf8), now: now))
+    }
+
     func testAccountStatusDoesNotMistakeSandboxForLiveEntitlement() throws {
         let sandbox = Data(#"{"user_id":"abc","subscription_status":"active","subscription_sandbox":true}"#.utf8)
         XCTAssertTrue(try ManagedAccountStatus.parse(sandbox).label.contains("Sandbox"))
